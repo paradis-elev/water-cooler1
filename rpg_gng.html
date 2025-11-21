@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pixel Shop RPG</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+body {margin:0; padding:0; font-family:'Press Start 2P', monospace; background:#111; color:#fff; text-align:center;}
+h1 { margin:20px 0; font-size:2rem; color:#66ffcc; }
+
+#game { max-width:900px; margin:0 auto; padding:10px; }
+
+.npc-row { display:flex; justify-content:center; gap:40px; height:100px; overflow:hidden; position:relative; }
+.npc {
+  width:48px; height:48px; image-rendering:pixelated;
+  position:relative; left:-100px; transition:left 0.8s ease, top 0.4s ease;
+}
+.npc-label { font-size:0.8rem; color:#aaa; }
+
+#dialogue-box {
+  width:90%; max-width:800px; margin:10px auto; padding:20px;
+  background:#222; border:4px solid #555; border-radius:8px; min-height:120px;
+}
+#dialogue-text { font-size:1rem; line-height:1.4; text-align:left; white-space:pre-wrap; }
+#choices { margin-top:15px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap; }
+
+.choice-btn, .action-btn { cursor:pointer; transition:0.1s; }
+.choice-btn { background:#44cc88; border:3px solid #006644; padding:8px 16px; font-size:0.9rem; }
+.choice-btn:hover { background:#66eeaa; }
+.action-btn { background:#00bbff; border:4px solid #006688; border-radius:4px;
+  padding:12px 24px; margin:0 10px; font-size:1rem; }
+.action-btn:hover { background:#66ddff; }
+
+#actions { margin-top:20px; }
+#hud { margin-top:20px; font-size:1rem; background:rgba(0,0,0,0.8); padding:8px; border:3px solid #555; display:inline-block; }
+.item-icon { width:24px; height:24px; vertical-align:middle; image-rendering:pixelated; margin-right:4px; }
+
+@keyframes idleBob {
+  0%,100% { top:0px; } 50% { top:-3px; }
+}
+.idle { animation: idleBob 1s infinite; }
+</style>
+</head>
+<body>
+
+<h1>Pixel Shop RPG</h1>
+<div id="game">
+
+  <div class="npc-row">
+    <div>
+      <img id="npc-customer1" class="npc idle" src="https://opengameart.org/sites/default/files/billy_idle.png" alt="Customer1">
+      <div class="npc-label">Customer 1</div>
+    </div>
+    <div>
+      <img id="npc-customer2" class="npc idle" src="https://opengameart.org/sites/default/files/billy_idle.png" alt="Customer2">
+      <div class="npc-label">Customer 2</div>
+    </div>
+    <div>
+      <img id="npc-customer3" class="npc idle" src="https://opengameart.org/sites/default/files/billy_idle.png" alt="Customer3">
+      <div class="npc-label">Customer 3</div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <img src="https://opengameart.org/sites/default/files/coin_gold.png" class="item-icon"> Gold: <span id="gold">100</span>
+    &nbsp;&nbsp; Reputation: <span id="reputation">0</span>
+  </div>
+
+  <div id="actions">
+    <button class="action-btn" onclick="showMenu('Chat')">Chat</button>
+    <button class="action-btn" onclick="showMenu('Fight')">Fight</button>
+    <button class="action-btn" onclick="showMenu('Act')">Act</button>
+    <button class="action-btn" onclick="showMenu('Spare')">Spare</button>
+  </div>
+
+  <div id="dialogue-box">
+    <div id="dialogue-text">A customer approaches...</div>
+    <div id="choices"></div>
+  </div>
+
+</div>
+
+<script>
+let gold = 100, reputation = 0;
+const customerQueue=["npc-customer1","npc-customer2","npc-customer3"];
+let currentCustomer=0;
+
+// Dialogue data
+const dialogueData={
+  Chat:["Hello! How are you today?","I like your wares!"],
+  Fight:["You attack the customer!","Ouch!"],
+  Act:["Smile","Offer discount"],
+  Spare:["You let the customer leave peacefully.","They nod and leave."]
+};
+
+// Choice buttons per menu
+const choiceOptions={
+  Chat:[{label:"Compliment", effect:()=>{reputation+=5; return "Customer smiles. +5 rep";}},
+        {label:"Ask info", effect:()=>{reputation+=2; return "Customer gives advice. +2 rep";}}],
+  Fight:[{label:"Strike", effect:()=>{gold+=5; return "You grab a coin! +5 gold";}},
+         {label:"Block", effect:()=>{return "No effect.";}}],
+  Act:[{label:"Offer potion (-20G)", effect:()=>{if(gold>=20){gold-=20; return "Potion sold! -20G";} else{return "Not enough gold!";}}}],
+  Spare:[{label:"Let go", effect:()=>{return "Customer leaves peacefully."}}]
+};
+
+// HUD update
+function updateHUD(){document.getElementById("gold").innerText=gold; document.getElementById("reputation").innerText=reputation;}
+
+// Slide animations
+function slideInCustomer(npcId){document.getElementById(npcId).style.left="0px";}
+function slideOutCustomer(npcId){document.getElementById(npcId).style.left="-100px";}
+
+// Start next customer
+function nextCustomer(){
+  if(currentCustomer>=customerQueue.length){
+    document.getElementById("dialogue-text").innerText="No more customers.";
+    document.getElementById("choices").innerHTML="";
+    return;
+  }
+  const npcId=customerQueue[currentCustomer];
+  slideInCustomer(npcId);
+  document.getElementById("dialogue-text").innerText="A customer approaches...";
+  document.getElementById("choices").innerHTML="";
+}
+function customerLeaves(){
+  const npcId=customerQueue[currentCustomer];
+  slideOutCustomer(npcId);
+  currentCustomer++;
+  setTimeout(nextCustomer,800);
+}
+
+// Menu system
+function showMenu(menu){
+  const container=document.getElementById("choices");
+  container.innerHTML="";
+  dialogueData[menu].forEach((line, i)=>{
+    const btn=document.createElement("button");
+    btn.className="choice-btn";
+    btn.innerText=line;
+    btn.onclick=()=>{
+      document.getElementById("dialogue-text").innerText=line;
+      setTimeout(()=>{
+        // Apply effect if defined
+        if(choiceOptions[menu][i]){
+          const res = choiceOptions[menu][i].effect();
+          document.getElementById("dialogue-text").innerText=res;
+          updateHUD();
+        }
+        setTimeout(customerLeaves,1200);
+      },800);
+      container.innerHTML="";
+    }
+    container.appendChild(btn);
+  });
+}
+
+// Start game
+setTimeout(nextCustomer,1000);
+updateHUD();
+</script>
+
+</body>
+</html>
